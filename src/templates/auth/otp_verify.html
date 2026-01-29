@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Verify Code{% endblock %}
+
+{% block content %}
+<div class="wave-bg min-h-screen w-full relative">
+    <div class="wave"></div>
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z">
+                        </path>
+                    </svg>
+                </div>
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">Verify Your Phone</h1>
+                <p class="text-gray-600">
+                    We sent a 6-digit code to your phone. Enter it below.
+                </p>
+            </div>
+
+            <form id="otpVerifyForm" class="space-y-6">
+                <div>
+                    <label for="code" class="block text-sm font-medium text-gray-700 mb-2">
+                        Verification Code
+                    </label>
+                    <input type="text" id="code" name="code" placeholder="000000" maxlength="6" pattern="[0-9]{6}"
+                        class="w-full px-4 py-3 text-center text-2xl tracking-widest border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                        required autofocus>
+                </div>
+
+                <div id="errorMessage" class="hidden p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-red-800 text-sm"></p>
+                </div>
+
+                <div id="successMessage" class="hidden p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p class="text-green-800 text-sm"></p>
+                </div>
+
+                <button type="submit" id="submitBtn"
+                    class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition duration-200 flex items-center justify-center">
+                    <span id="btnText">Verify Code</span>
+                    <svg id="spinner" class="hidden animate-spin ml-2 h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                        </circle>
+                        <path class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                </button>
+            </form>
+
+            <div class="mt-6 text-center space-y-2">
+                <button id="resendBtn" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                    Resend Code
+                </button>
+                <br>
+                <a href="{{ url_for('otp_login') }}" class="text-gray-600 hover:text-gray-800 text-sm">
+                    Use Different Phone Number
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-focus and format code input
+    const codeInput = document.getElementById('code');
+    codeInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.replace(/[^0-9]/g, '');
+    });
+
+    // Verify form submission
+    document.getElementById('otpVerifyForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const code = codeInput.value;
+        const submitBtn = document.getElementById('submitBtn');
+        const btnText = document.getElementById('btnText');
+        const spinner = document.getElementById('spinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+
+        if (code.length !== 6) {
+            errorMessage.querySelector('p').textContent = 'Please enter a 6-digit code';
+            errorMessage.classList.remove('hidden');
+            return;
+        }
+
+        // Show loading state
+        submitBtn.disabled = true;
+        btnText.textContent = 'Verifying...';
+        spinner.classList.remove('hidden');
+        errorMessage.classList.add('hidden');
+        successMessage.classList.add('hidden');
+
+        try {
+            const response = await fetch('/otp/verify', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ code })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Show success message
+                successMessage.querySelector('p').textContent = data.message || 'Success! Redirecting...';
+                successMessage.classList.remove('hidden');
+
+                // Redirect after a short delay
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 1500);
+            } else {
+                // Show error
+                errorMessage.querySelector('p').textContent = data.error || 'Invalid code';
+                errorMessage.classList.remove('hidden');
+                codeInput.value = '';
+                codeInput.focus();
+            }
+        } catch (error) {
+            errorMessage.querySelector('p').textContent = 'Network error. Please try again.';
+            errorMessage.classList.remove('hidden');
+        } finally {
+            // Reset button state
+            submitBtn.disabled = false;
+            btnText.textContent = 'Verify Code';
+            spinner.classList.add('hidden');
+        }
+    });
+
+    // Resend code
+    document.getElementById('resendBtn').addEventListener('click', async () => {
+        const resendBtn = document.getElementById('resendBtn');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+
+        resendBtn.disabled = true;
+        resendBtn.textContent = 'Sending...';
+        errorMessage.classList.add('hidden');
+        successMessage.classList.add('hidden');
+
+        try {
+            const response = await fetch('/otp/resend', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                successMessage.querySelector('p').textContent = data.message || 'Code sent!';
+                successMessage.classList.remove('hidden');
+            } else {
+                errorMessage.querySelector('p').textContent = data.error || 'Failed to resend code';
+                errorMessage.classList.remove('hidden');
+            }
+        } catch (error) {
+            errorMessage.querySelector('p').textContent = 'Network error. Please try again.';
+            errorMessage.classList.remove('hidden');
+        } finally {
+            resendBtn.disabled = false;
+            resendBtn.textContent = 'Resend Code';
+        }
+    });
+</script>
+{% endblock %}

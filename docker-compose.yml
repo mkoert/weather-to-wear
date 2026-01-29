@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile-app
+    expose:
+      - "5001"
+    command: >
+      flask run --host=0.0.0.0 --port=5001  --debug
+    environment:
+      - FLASK_ENV=development
+      - FLASK_APP=main.py
+      - SERVER_NAME=${SERVER_NAME:-localhost:8080}
+      - APP_SECRET_KEY=${APP_SECRET_KEY}
+      - API_KEY=${API_KEY}
+      - API_BASE_URL=${API_BASE_URL}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AWS_OAUTH_AUTHORITY=${AWS_OAUTH_AUTHORITY}
+      - AWS_OAUTH_CLIENT_ID=${AWS_OAUTH_CLIENT_ID}
+      - AWS_OAUTH_CLIENT_SECRET=${AWS_OAUTH_CLIENT_SECRET}
+      - AWS_OAUTH_METADATA_URL=${AWS_OAUTH_METADATA_URL}
+      - AWS_COGNITO_USER_POOL_ID=${AWS_COGNITO_USER_POOL_ID}
+      - AWS_COGNITO_CLIENT_ID=${AWS_COGNITO_CLIENT_ID}
+      - AWS_COGNITO_REGION=${AWS_COGNITO_REGION}
+      - AWS_COGNITO_IDENTITY_POOL_ID=${AWS_COGNITO_IDENTITY_POOL_ID}
+      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_USER=${DATABASE_USER}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_NAME=${DATABASE_NAME}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - OTP_PROVIDER=${OTP_PROVIDER:-cognito}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
+      - TWILIO_VERIFY_SERVICE_SID=${TWILIO_VERIFY_SERVICE_SID}
+      - LOCATION=${LOCATION:-grand%20rapids%20mi}
+    volumes:
+      - ./src:/app
+      - weather-cache:/app/cache
+    # Override to use Gunicorn in production (default from Dockerfile)
+    # For development, you can override with: flask run --host=0.0.0.0 --port=5001
+    networks:
+      - app-network
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile-proxy
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src/static:/app/static:ro
+    depends_on:
+      - web
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  weather-cache:

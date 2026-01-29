@@ -1,0 +1,63 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+  DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies and build Tailwind CSS
+        run: |
+          npm ci
+          npm run tailwind-build
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Build and push weather-app image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile-app
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.DOCKER_HUB_USERNAME }}/weather-app:${{ github.sha }}
+            ${{ env.DOCKER_HUB_USERNAME }}/weather-app:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push weather-nginx image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile-proxy
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.DOCKER_HUB_USERNAME }}/weather-nginx:${{ github.sha }}
+            ${{ env.DOCKER_HUB_USERNAME }}/weather-nginx:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

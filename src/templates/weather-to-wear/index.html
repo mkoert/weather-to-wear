@@ -1,0 +1,273 @@
+{% extends 'base.html' %}
+
+{% block title %}Weather to Wear?{% endblock %}
+
+{% block content %}
+<div class="wave-bg min-h-screen w-full relative">
+    <div class="wave"></div>
+
+    <div class="relative z-10 min-h-screen flex flex-col">
+        <!-- Header -->
+        <div class="pt-12 px-8">
+            <h1 class="text-5xl font-bold text-white drop-shadow-lg">Weather to Wear?</h1>
+
+
+            <!-- <div class="flex flex-col gap-2 mt-4">
+                <div class="flex flex-col md:flex-row md:items-center gap-4">
+                    <p class="text-xl text-blue-100" id="location-display">Grand Rapids, MI</p>
+                    <div class="flex gap-2">
+                        <input type="text" id="zipcode-input" placeholder="Enter zipcode"
+                            class="flex-1 md:flex-none text-base md:text-sm px-4 py-3 md:py-2 rounded-lg border-2 border-white/30 bg-white/20 backdrop-blur-sm text-white placeholder-white/60 focus:outline-none focus:border-white/60 transition-all" />
+                        <button id="search-btn"
+                            class="px-6 py-3 md:py-2 bg-white/30 hover:bg-white/40 backdrop-blur-sm text-white font-semibold rounded-lg transition-all border-2 border-white/30 hover:border-white/60">
+                            Search
+                        </button>
+                    </div>
+                </div>
+                <div id="error-message"
+                    class="hidden px-4 py-2 bg-red-500/20 backdrop-blur-sm border-2 border-red-400/50 rounded-lg text-red-100 text-sm">
+                </div>
+            </div> -->
+        </div>
+
+
+        <div class="flex-1 px-1 py-1">
+            <div class="max-w-6xl mx-auto px-4 relative">
+                <!-- Fluffy Clouds -->
+                <div class="cloud cloud-1"></div>
+                <div class="cloud cloud-2"></div>
+                <div class="cloud cloud-3"></div>
+
+                {% if session.get('logged_in') %}
+                <!-- Welcome Back Card -->
+                <div
+                    class="welcome-card bg-blue-200/50 backdrop-blur-md border-2 border-blue-300/60 rounded-2xl p-6 mt-4 shadow-xl relative z-10">
+                    <div class="flex items-center gap-3">
+                        <div class="text-4xl">👋</div>
+                        <div>
+                            <p class="text-2xl font-bold text-white drop-shadow-md">Welcome back!</p>
+                            <!-- <p class="text-lg text-blue-50">{{ session.get('user_name') }}</p> -->
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <!-- Please Login Card -->
+                <div
+                    class="login-card bg-blue-200/50  border-2 border-blue-300/60 rounded-2xl p-8 mt-4 shadow-xl text-center relative z-10">
+                    <!-- <div class="text-6xl mb-4">✨</div> -->
+                    <p class="text-2xl font-bold text-white drop-shadow-md mb-2">Let's get you styled!</p>
+                    <p class="text-lg text-blue-50 mb-4">Please log in to use the Weather to Wear feature</p>
+                    <a href="/otp/login"
+                        class="inline-block bg-white/30 hover:bg-white/40 backdrop-blur-sm text-white font-bold py-3 px-8 rounded-full transition-all border-2 border-white/50 hover:border-white/70 hover:scale-105 transform shadow-lg">
+                        Log In ✨
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+
+        <!-- Main Content -->
+        {% if session.get('logged_in') %}
+        <div class="flex-1 px-1 py-1">
+            <div class="max-w-6xl mx-auto">
+                <!-- Upload Form -->
+                <div class="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-4 mb-12 px-1 py-1">
+                    <div class="stat-card p-8 rounded-xl mb-8">
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Upload Your Closet Photo</h2>
+                        <p class="text-gray-600 mb-6">Upload a photo of your clothes and get AI-powered suggestions
+                            based on current weather conditions.</p>
+
+                        <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                            <p class="text-blue-800">
+                                <strong>Note:</strong> Limited to 1 use per day. By using this feature, you agree to our
+                                <a href="/terms" target="_blank" class="underline hover:text-blue-600">Terms of Use</a>.
+                            </p>
+                        </div>
+
+                        <form id="closet-upload-form" class="space-y-4">
+                            <div
+                                class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-500 transition-colors">
+                                <input type="file" id="closet-image" name="image" accept="image/*" class="hidden" />
+                                <label for="closet-image" class="cursor-pointer">
+                                    <div id="upload-preview" class="hidden mb-4">
+                                        <img id="preview-image" src="" alt="Preview"
+                                            class="max-h-64 mx-auto rounded-lg shadow-lg" />
+                                    </div>
+                                    <div id="upload-placeholder">
+                                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none"
+                                            viewBox="0 0 48 48">
+                                            <path
+                                                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                        <p class="mt-2 text-sm text-gray-600">Click to upload or drag and drop</p>
+                                        <p class="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <button type="submit" id="get-suggestions-btn"
+                                class="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 px-6 rounded-lg hover:from-purple-600 hover:to-pink-600 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
+                                Get Fashion Suggestions
+                            </button>
+                        </form>
+
+                        <div id="loading-message" class="hidden mt-4 text-center">
+                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500">
+                            </div>
+                            <p class="mt-2 text-gray-600">Analyzing your closet and weather conditions...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-4 gap-4 mb-12">
+                    <!-- Clothing Recommendation -->
+                    <!-- <div class="stat-card p-6 rounded-xl">
+                        <p class="text-gray-600 text-sm font-semibold uppercase">Clothing Recommendation</p>
+                        <p class="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 mt-2"
+                            data-stat="clothing-recommendation">--</p>
+                    </div> -->
+                </div>
+
+                <!-- Suggestions Display -->
+                <div id="suggestions-container" class="hidden stat-card p-8 rounded-xl">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4">Your Fashion Suggestions</h3>
+                    <div id="suggestions-content" class="prose max-w-none"></div>
+                </div>
+
+            </div>
+        </div>
+        {% endif %}
+        <!-- Footer -->
+        <div class="relative z-10 py-6 px-8 mt-auto">
+            <div class="max-w-6xl mx-auto text-center">
+                <p class="text-white/80 text-sm">
+                    <a href="/terms" class="hover:text-white underline">Terms of Use</a> |
+                    <a href="/" class="hover:text-white underline">Home</a>
+                </p>
+                <p class="text-white/60 text-xs mt-2">
+                    AI suggestions are for promotional use only. Images are processed by third-party AI systems.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .welcome-card,
+    .login-card {
+        background: linear-gradient(to right, rgba(147, 197, 253, 0.4), rgba(191, 219, 254, 0.4));
+        backdrop-filter: blur(12px);
+    }
+
+    /* Fluffy Cloud Styling */
+    .cloud {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 100px;
+        box-shadow: 0 8px 20px rgba(255, 255, 255, 0.2);
+    }
+
+    .cloud::before,
+    .cloud::after {
+        content: '';
+        position: absolute;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 100px;
+    }
+
+    .cloud-1 {
+        width: 120px;
+        height: 50px;
+        top: -20px;
+        left: -30px;
+        z-index: 1;
+        animation: float 6s ease-in-out infinite;
+    }
+
+    .cloud-1::before {
+        width: 60px;
+        height: 60px;
+        top: -30px;
+        left: 15px;
+    }
+
+    .cloud-1::after {
+        width: 80px;
+        height: 70px;
+        top: -35px;
+        right: 10px;
+    }
+
+    .cloud-2 {
+        width: 100px;
+        height: 40px;
+        top: 30px;
+        right: -20px;
+        z-index: 1;
+        animation: float 7s ease-in-out infinite 1s;
+    }
+
+    .cloud-2::before {
+        width: 50px;
+        height: 50px;
+        top: -25px;
+        left: 10px;
+    }
+
+    .cloud-2::after {
+        width: 60px;
+        height: 55px;
+        top: -28px;
+        right: 15px;
+    }
+
+    .cloud-3 {
+        width: 80px;
+        height: 35px;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1;
+        animation: float 8s ease-in-out infinite 2s;
+    }
+
+    .cloud-3::before {
+        width: 45px;
+        height: 45px;
+        top: -20px;
+        left: 8px;
+    }
+
+    .cloud-3::after {
+        width: 50px;
+        height: 48px;
+        top: -22px;
+        right: 12px;
+    }
+
+    @keyframes float {
+
+        0%,
+        100% {
+            transform: translateY(0px);
+        }
+
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    /* #hour-detail-panel.active {
+            opacity: 1;
+        } */
+
+    /* .hidden {
+            display: none !important;
+        } */
+</style>
+
+<script type="module" src="/static/js/weather-to-wear.js"></script>
+{% endblock %}

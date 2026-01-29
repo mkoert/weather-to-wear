@@ -1,0 +1,137 @@
+@import "tailwindcss";
+/* 
+@import "tailwindcss/base";
+
+@import "tailwindcss/components";
+
+@import "tailwindcss/utilities"; */
+
+/* https://v1.tailwindcss.com/docs/breakpoints */
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+}
+
+h1 {
+    text-align: center;
+    /* color: #333; */
+}
+
+.btn {
+    @apply font-bold py-2 px-4 rounded;
+}
+.btn-blue {
+    @apply bg-blue-500 text-white;
+}
+.btn-blue:hover {
+    @apply bg-blue-700;
+}
+
+@keyframes wave {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(10px); }
+    100% { transform: translateX(0); }
+}
+
+@keyframes gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.wave-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
+    background-size: 200% 200%;
+    animation: gradient 15s ease infinite;
+    position: relative;
+    overflow: hidden;
+}
+
+.wave {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 200%;
+    height: 100px;
+    background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120"><path d="M0,50 Q300,0 600,50 T1200,50 L1200,120 L0,120 Z" fill="%23ffffff" fill-opacity="0.1"/></svg>') repeat-x;
+    animation: wave 7s linear infinite;
+}
+
+.chart-container {
+    
+    margin: 0 auto;
+    padding: 20px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+@media screen and (min-width: 1024px) {
+    .chart-container {
+        width: 90%;
+    }
+}
+
+.stat-card {
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.chart {
+    width: 100%;
+    height: 400px;
+}
+
+.tooltip {
+    position: absolute;
+    text-align: center;
+    padding: 5px;
+    font: 12px sans-serif;
+    background: lightsteelblue;
+    border: 0;
+    border-radius: 8px;
+    pointer-events: none;
+}
+
+.axis path,
+.axis line {
+    fill: none;
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    font-family: sans-serif;
+    font-size: 12px;
+}
+
+.grid .tick {
+    stroke: lightgrey;
+    opacity: 0.7;
+}
+
+.grid .tick line {
+    stroke: lightgrey;
+    opacity: 0.7;
+}
+
+svg text {
+    fill: #333;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.bar {
+    /* fill: url(#barGradient); */
+    transition: all 0.3s ease;
+}
+
+.bar:hover {
+    opacity: 0.8;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
