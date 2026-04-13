@@ -48,6 +48,8 @@ jobs:
             ${{ env.DOCKER_HUB_USERNAME }}/weather-app:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          sbom: true
+          provenance: mode=max
 
       - name: Build and push weather-nginx image
         uses: docker/build-push-action@v5
@@ -61,3 +63,5 @@ jobs:
             ${{ env.DOCKER_HUB_USERNAME }}/weather-nginx:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          sbom: true
+          provenance: mode=max
