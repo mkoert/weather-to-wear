@@ -20,7 +20,9 @@ class DatabaseConnection:
             'user': os.getenv('DATABASE_USER', 'postgres'),
             'password': os.getenv('DATABASE_PASSWORD', ''),
             'database': os.getenv('DATABASE_NAME', 'weather_to_wear'),
-            'port': int(os.getenv('DATABASE_PORT', '5432'))
+            'port': int(os.getenv('DATABASE_PORT', '5432')),
+            'connect_timeout': 5,
+            'options': '-c statement_timeout=5000'
         }
         logger.info("Connecting to PostgreSQL at %s:%s db=%s user=%s",
                      self.db_config['host'], self.db_config['port'],

@@ -23,23 +23,41 @@ h1 {
 .btn {
     @apply font-bold py-2 px-4 rounded;
 }
+
 .btn-blue {
     @apply bg-blue-500 text-white;
 }
+
 .btn-blue:hover {
     @apply bg-blue-700;
 }
 
 @keyframes wave {
-    0% { transform: translateX(0); }
-    50% { transform: translateX(10px); }
-    100% { transform: translateX(0); }
+    0% {
+        transform: translateX(0);
+    }
+
+    50% {
+        transform: translateX(10px);
+    }
+
+    100% {
+        transform: translateX(0);
+    }
 }
 
 @keyframes gradient {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
 }
 
 .wave-bg {
@@ -61,7 +79,7 @@ h1 {
 }
 
 .chart-container {
-    
+
     margin: 0 auto;
     padding: 20px;
     background-color: white;
@@ -72,6 +90,7 @@ h1 {
     border-radius: 20px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
+
 @media screen and (min-width: 1024px) {
     .chart-container {
         width: 90%;
@@ -134,4 +153,50 @@ svg text {
 .bar:hover {
     opacity: 0.8;
     filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+/* Header mascot - overlaid behind title */
+.header-mascot {
+    width: 90px;
+    height: auto;
+    filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
+    flex-shrink: 0;
+}
+
+/* Weather to Wear callout */
+.wtw-callout {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 20px;
+    padding: 24px 32px;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.wtw-callout:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.1) 100%);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.wtw-mascot {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+    flex-shrink: 0;
+}
+
+.wtw-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 10px;
+    border-radius: 999px;
 }
