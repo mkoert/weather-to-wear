@@ -395,6 +395,49 @@ def hourly_data():
         logger.error("Unexpected error for location=%s: %s", query_location, e, exc_info=True)
         return jsonify({"error": "An unexpected error occurred. Please try again."}), 500
 
+def parse_claude_suggestions(raw_response):
+    """Parse Claude's response into a clean suggestions object.
+    Handles markdown code fences and validates the expected structure."""
+    cleaned = raw_response.strip()
+
+    # Strip markdown code fences
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[1]
+        cleaned = cleaned.rsplit("```", 1)[0].strip()
+
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        logger.warning("Claude returned non-JSON response")
+        return {
+            "summary": raw_response,
+            "outfit": [],
+            "accessories": [],
+            "tips": []
+        }
+
+    # Normalize into a consistent shape
+    return {
+        "summary": data.get("summary", ""),
+        "outfit": [
+            {
+                "item": item.get("item", ""),
+                "description": item.get("description", ""),
+                "reason": item.get("reason", "")
+            }
+            for item in data.get("outfit", [])
+        ],
+        "accessories": [
+            {
+                "item": acc.get("item", ""),
+                "reason": acc.get("reason", "")
+            }
+            for acc in data.get("accessories", [])
+        ],
+        "tips": data.get("tips", [])
+    }
+
+
 ## Fashion Suggestions Endpoint
 @app.route('/api/fashion-suggestions', methods=['POST'])
 def fashion_suggestions():
@@ -467,17 +510,37 @@ Current Weather Conditions:
                         },
                         {
                             "type": "text",
-                            "text": f"""You are a fashion advisor. Analyze the clothing items in this closet photo and provide specific outfit suggestions based on the current weather conditions.
+                            "text": f"""You are a fashion advisor. Analyze the clothing items in this closet photo and suggest an outfit for the current weather.
 
 {weather_summary}
 
-Please provide:
-1. A recommended outfit combination from the visible clothing items
-2. Why this outfit is suitable for the current weather
-3. Any additional accessories or layers you'd suggest (if you can see them in the photo)
-4. Tips for staying comfortable in these conditions
+Respond with ONLY valid JSON in this exact format (no markdown, no code fences):
+{{
+  "summary": "One sentence explaining the overall outfit strategy for the weather.",
+  "outfit": [
+    {{
+      "item": "Name of clothing item",
+      "description": "Brief description (color, style, etc.)",
+      "reason": "Why it works for this weather"
+    }}
+  ],
+  "accessories": [
+    {{
+      "item": "Accessory name",
+      "reason": "Why you'd want it"
+    }}
+  ],
+  "tips": [
+    "Short practical tip for comfort in this weather"
+  ]
+}}
 
-Keep your response concise, practical, and friendly."""
+Rules:
+- Only suggest items you can actually see in the photo.
+- Keep outfit to 3-5 items max.
+- Keep accessories to 2-3 items max.
+- Keep tips to 3-4 items max.
+- Be specific about colors and styles you see."""
                         }
                     ],
                 }
@@ -485,7 +548,9 @@ Keep your response concise, practical, and friendly."""
         )
 
         logger.info("Claude API response received, usage=%s", message.usage)
-        suggestions = message.content[0].text
+        raw_response = message.content[0].text
+
+        suggestions = parse_claude_suggestions(raw_response)
 
         return jsonify({
             "suggestions": suggestions,

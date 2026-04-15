@@ -184,38 +184,77 @@ function displaySuggestions(suggestions) {
     const content = document.getElementById('suggestions-content');
 
     if (container && content) {
-        // Format the suggestions (assuming it's markdown or plain text from Claude)
         content.innerHTML = formatSuggestions(suggestions);
         container.classList.remove('hidden');
-
-        // Scroll to suggestions
         container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 
-// Format suggestions text
-function formatSuggestions(text) {
-    // Convert line breaks to HTML
-    const formatted = text
-        .split('\n')
-        .map(line => {
-            // Bold text for headers (lines ending with :)
-            if (line.trim().endsWith(':')) {
-                return `<h4 class="font-bold text-lg mt-4 mb-2 text-gray-800">${line}</h4>`;
-            }
-            // Bullet points
-            if (line.trim().startsWith('-') || line.trim().startsWith('•')) {
-                return `<li class="ml-4 text-gray-700">${line.substring(1).trim()}</li>`;
-            }
-            // Regular paragraphs
-            if (line.trim()) {
-                return `<p class="text-gray-700 mb-2">${line}</p>`;
-            }
-            return '';
-        })
-        .join('');
+// Format structured suggestions into cards
+function formatSuggestions(data) {
+    // Fallback for string responses
+    if (typeof data === 'string') {
+        return `<p class="text-gray-700">${data.replace(/\n/g, '<br>')}</p>`;
+    }
 
-    return formatted;
+    let html = '';
+
+    // Summary
+    if (data.summary) {
+        html += `<p class="text-lg text-gray-700 mb-6 leading-relaxed">${data.summary}</p>`;
+    }
+
+    // Outfit items
+    if (data.outfit && data.outfit.length > 0) {
+        html += `<h4 class="text-sm font-bold uppercase tracking-wide text-gray-500 mb-3">Recommended Outfit</h4>`;
+        html += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">`;
+        for (const item of data.outfit) {
+            html += `
+                <div class="outfit-card flex items-start gap-3 p-4 bg-white rounded-xl border border-gray-100 shadow-sm">
+                    <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="font-semibold text-gray-800">${item.item}</p>
+                        <p class="text-sm text-gray-500">${item.description}</p>
+                        <p class="text-xs text-blue-600 mt-1">${item.reason}</p>
+                    </div>
+                </div>`;
+        }
+        html += `</div>`;
+    }
+
+    // Accessories
+    if (data.accessories && data.accessories.length > 0) {
+        html += `<h4 class="text-sm font-bold uppercase tracking-wide text-gray-500 mb-3">Accessories</h4>`;
+        html += `<div class="flex flex-wrap gap-2 mb-6">`;
+        for (const acc of data.accessories) {
+            html += `
+                <span class="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-800 rounded-full text-sm border border-purple-100"
+                      title="${acc.reason}">
+                    ${acc.item}
+                </span>`;
+        }
+        html += `</div>`;
+    }
+
+    // Tips
+    if (data.tips && data.tips.length > 0) {
+        html += `<h4 class="text-sm font-bold uppercase tracking-wide text-gray-500 mb-3">Comfort Tips</h4>`;
+        html += `<ul class="space-y-2">`;
+        for (const tip of data.tips) {
+            html += `
+                <li class="flex items-start gap-2 text-gray-700 text-sm">
+                    <span class="text-green-500 mt-0.5 shrink-0">&#10003;</span>
+                    ${tip}
+                </li>`;
+        }
+        html += `</ul>`;
+    }
+
+    return html;
 }
 
 // Handle search button click
