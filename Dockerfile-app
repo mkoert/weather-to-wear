@@ -1,3 +1,16 @@
+# Stage 1: Build Tailwind CSS
+FROM node:20-slim AS tailwind-build
+
+WORKDIR /build
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY src/static/css/style.css ./src/static/css/style.css
+COPY src/templates/ ./src/templates/
+RUN npx tailwindcss -i ./src/static/css/style.css -o ./src/static/css/output.css --minify
+
+# Stage 2: Python app
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -6,6 +19,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ .
+COPY --from=tailwind-build /build/src/static/css/output.css ./static/css/output.css
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser && \
