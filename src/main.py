@@ -1,6 +1,8 @@
 import os
 import json
+import logging
 import base64
+import traceback
 from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, redirect, url_for, session, request
 import anthropic
@@ -10,6 +12,14 @@ from utils.data_processor import get_hourly_data
 
 # Import database connection
 from db.connection import db, get_cached_data, cache_data
+
+# Configure structured logging for k8s
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s [%(name)s] %(message)s',
+    datefmt='%Y-%m-%dT%H:%M:%S%z'
+)
+logger = logging.getLogger('weather-app')
 
 # Import OTP auth based on provider
 OTP_PROVIDER = os.getenv('OTP_PROVIDER', 'cognito').lower()
@@ -25,7 +35,7 @@ else:
 
 
 app = Flask(__name__, template_folder='templates')
-app.config['SERVER_NAME'] = 'localhost:8080'
+app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', 'localhost:8080')
 app.secret_key = os.environ.get('APP_SECRET_KEY') or 'fallback-dev-key' 
 
 api_key = os.getenv('API_KEY')
@@ -49,21 +59,18 @@ else:
 # Initialize OTP Auth based on provider
 try:
     otp_auth = AuthProvider()
-    print(f"OTP Provider: Using {OTP_PROVIDER}")
+    logger.info("OTP provider initialized: %s", OTP_PROVIDER)
 except ValueError as e:
-    print(f"Warning: OTP authentication not configured: {e}")
+    logger.warning("OTP authentication not configured: %s", e)
     otp_auth = None
 
 # Initialize database
 try:
     db.init_tables()
-    print("Database tables initialized successfully")
+    logger.info("Database tables initialized successfully")
 except Exception as e:
-    import traceback
-    print(f"ERROR: Database initialization failed: {e}")
-    print(traceback.format_exc())
-    # Don't fail the app startup, but log the error
-    print("WARNING: Running without database. Some features may not work.")
+    logger.error("Database initialization failed: %s", e, exc_info=True)
+    logger.warning("Running without database. Some features may not work.")
 
 # app.secret_key = os.urandom(24)  # Use a secure random key in production
 # oauth = OAuth(app)
@@ -357,31 +364,79 @@ def hourly_data():
         query_location = location
 
     # Check cache first
-    cached = get_cached_data(query_location)
-    if cached:
-        print(f"Returning cached data for {query_location}")
-        return jsonify(cached)
+    try:
+        cached = get_cached_data(query_location)
+        if cached:
+            logger.info("Cache hit for location=%s", query_location)
+            return jsonify(cached)
+    except Exception as e:
+        logger.error("Cache read failed for location=%s: %s", query_location, e, exc_info=True)
 
     # Fetch from API if not cached
     try:
         endpoint = f'{query_location}?unitGroup=us&include=days%2Chours%2Calerts%2Ccurrent'
         data = api_client.fetch_data(endpoint)
-        # print(f"Raw API response for {query_location}:", data)
         hourly_data_result = get_hourly_data(data, datetime)
-        # print("Processed data:", hourly_data_result)
 
-        # Cache the result
-        cache_data(query_location, hourly_data_result)
+        # Cache the result (non-fatal if it fails)
+        try:
+            cache_data(query_location, hourly_data_result)
+        except Exception as e:
+            logger.error("Cache write failed for location=%s: %s", query_location, e, exc_info=True)
 
         return jsonify(hourly_data_result)
     except requests.exceptions.HTTPError as e:
-        print(f"HTTP Error for location {query_location}: {e}")
+        logger.error("Weather API HTTP error for location=%s status=%s: %s",
+                      query_location, e.response.status_code, e, exc_info=True)
         if e.response.status_code == 400:
             return jsonify({"error": "Invalid location or zipcode. Please enter a valid US zipcode or city name."}), 400
         return jsonify({"error": "Failed to fetch weather data. Please try again later."}), 500
     except Exception as e:
-        print(f"Error fetching data for {query_location}: {e}")
+        logger.error("Unexpected error for location=%s: %s", query_location, e, exc_info=True)
         return jsonify({"error": "An unexpected error occurred. Please try again."}), 500
+
+def parse_claude_suggestions(raw_response):
+    """Parse Claude's response into a clean suggestions object.
+    Handles markdown code fences and validates the expected structure."""
+    cleaned = raw_response.strip()
+
+    # Strip markdown code fences
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[1]
+        cleaned = cleaned.rsplit("```", 1)[0].strip()
+
+    try:
+        data = json.loads(cleaned)
+    except json.JSONDecodeError:
+        logger.warning("Claude returned non-JSON response")
+        return {
+            "summary": raw_response,
+            "outfit": [],
+            "accessories": [],
+            "tips": []
+        }
+
+    # Normalize into a consistent shape
+    return {
+        "summary": data.get("summary", ""),
+        "outfit": [
+            {
+                "item": item.get("item", ""),
+                "description": item.get("description", ""),
+                "reason": item.get("reason", "")
+            }
+            for item in data.get("outfit", [])
+        ],
+        "accessories": [
+            {
+                "item": acc.get("item", ""),
+                "reason": acc.get("reason", "")
+            }
+            for acc in data.get("accessories", [])
+        ],
+        "tips": data.get("tips", [])
+    }
+
 
 ## Fashion Suggestions Endpoint
 @app.route('/api/fashion-suggestions', methods=['POST'])
@@ -455,26 +510,47 @@ Current Weather Conditions:
                         },
                         {
                             "type": "text",
-                            "text": f"""You are a fashion advisor. Analyze the clothing items in this closet photo and provide specific outfit suggestions based on the current weather conditions.
+                            "text": f"""You are a fashion advisor. Analyze the clothing items in this closet photo and suggest an outfit for the current weather.
 
 {weather_summary}
 
-Please provide:
-1. A recommended outfit combination from the visible clothing items
-2. Why this outfit is suitable for the current weather
-3. Any additional accessories or layers you'd suggest (if you can see them in the photo)
-4. Tips for staying comfortable in these conditions
+Respond with ONLY valid JSON in this exact format (no markdown, no code fences):
+{{
+  "summary": "One sentence explaining the overall outfit strategy for the weather.",
+  "outfit": [
+    {{
+      "item": "Name of clothing item",
+      "description": "Brief description (color, style, etc.)",
+      "reason": "Why it works for this weather"
+    }}
+  ],
+  "accessories": [
+    {{
+      "item": "Accessory name",
+      "reason": "Why you'd want it"
+    }}
+  ],
+  "tips": [
+    "Short practical tip for comfort in this weather"
+  ]
+}}
 
-Keep your response concise, practical, and friendly."""
+Rules:
+- Only suggest items you can actually see in the photo.
+- Keep outfit to 3-5 items max.
+- Keep accessories to 2-3 items max.
+- Keep tips to 3-4 items max.
+- Be specific about colors and styles you see."""
                         }
                     ],
                 }
             ],
         )
 
-        print(f"Claude API response: {message}")
-        # Extract the response text
-        suggestions = message.content[0].text
+        logger.info("Claude API response received, usage=%s", message.usage)
+        raw_response = message.content[0].text
+
+        suggestions = parse_claude_suggestions(raw_response)
 
         return jsonify({
             "suggestions": suggestions,
@@ -482,7 +558,7 @@ Keep your response concise, practical, and friendly."""
         }), 200
 
     except Exception as e:
-        print(f"Error calling Claude API: {e}")
+        logger.error("Claude API call failed: %s", e, exc_info=True)
         return jsonify({"error": f"Failed to get fashion suggestions: {str(e)}"}), 500
 
 if __name__ == '__main__':

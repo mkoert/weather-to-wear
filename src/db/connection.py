@@ -3,9 +3,12 @@ PostgreSQL Database Connection Module
 """
 
 import os
+import logging
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from contextlib import contextmanager
+
+logger = logging.getLogger('weather-app.db')
 
 
 class DatabaseConnection:
@@ -17,10 +20,13 @@ class DatabaseConnection:
             'user': os.getenv('DATABASE_USER', 'postgres'),
             'password': os.getenv('DATABASE_PASSWORD', ''),
             'database': os.getenv('DATABASE_NAME', 'weather_to_wear'),
-            'port': int(os.getenv('DATABASE_PORT', '5432'))
+            'port': int(os.getenv('DATABASE_PORT', '5432')),
+            'connect_timeout': 5,
+            'options': '-c statement_timeout=5000'
         }
-        print(f"Database: Attempting to connect to PostgreSQL at {self.db_config['host']}:{self.db_config['port']}")
-        print(f"Database: Using database '{self.db_config['database']}' as user '{self.db_config['user']}'")
+        logger.info("Connecting to PostgreSQL at %s:%s db=%s user=%s",
+                     self.db_config['host'], self.db_config['port'],
+                     self.db_config['database'], self.db_config['user'])
 
     @contextmanager
     def get_connection(self):
@@ -37,12 +43,12 @@ class DatabaseConnection:
 
     def init_tables(self):
         """Initialize database tables"""
-        print("Database: Creating tables if they don't exist...")
+        logger.info("Creating tables if they don't exist")
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
             # Weather cache table
-            print("Database: Creating hourly_cache table...")
+            logger.info("Creating hourly_cache table")
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS hourly_cache (
                     id SERIAL PRIMARY KEY,
