@@ -1,7 +1,10 @@
 const apiUrl = '/api/hourly-data';
 const fashionApiUrl = '/api/fashion-suggestions';
+const chatApiUrl = '/api/chat';
 let currentWeatherData = null;
 let currentZipcode = null;
+let currentSuggestions = null;
+let chatHistory = [];
 
 // Get zipcode from localStorage
 function getSavedZipcode() {
@@ -188,6 +191,142 @@ function displaySuggestions(suggestions) {
         container.classList.remove('hidden');
         container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
+
+    currentSuggestions = suggestions;
+    openChat();
+}
+
+// Polar Wear Chat
+const ACTIVITY_STARTERS = [
+    'Going for a walk',
+    'Running outside',
+    'Commuting to work',
+    'Outdoor errands',
+    'Mostly indoors',
+    'Something else',
+];
+
+function openChat() {
+    const widget = document.getElementById('chat-widget');
+    if (!widget) return;
+
+    widget.classList.remove('hidden');
+
+    if (chatHistory.length === 0) {
+        renderChatMessage('assistant', "Hi, I'm Polar Wear! What are you doing today?");
+        renderStarters(ACTIVITY_STARTERS);
+    }
+
+    // Panel stays closed; tease the user with an expanded pill after a beat.
+    const toggle = document.getElementById('chat-toggle');
+    if (toggle) {
+        setTimeout(() => toggle.classList.add('expanded'), 600);
+    }
+}
+
+function setChatPanelOpen(isOpen) {
+    const panel = document.getElementById('chat-panel');
+    const toggle = document.getElementById('chat-toggle');
+    if (!panel || !toggle) return;
+    panel.classList.toggle('hidden', !isOpen);
+    toggle.classList.toggle('hidden', isOpen);
+}
+
+function renderStarters(options) {
+    const startersEl = document.getElementById('chat-starters');
+    if (!startersEl) return;
+
+    startersEl.innerHTML = '';
+    startersEl.classList.remove('hidden');
+
+    options.forEach((text) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'chat-starter';
+        btn.textContent = text;
+        btn.addEventListener('click', () => sendChatMessage(text));
+        startersEl.appendChild(btn);
+    });
+}
+
+function renderChatMessage(role, text) {
+    const messagesEl = document.getElementById('chat-messages');
+    if (!messagesEl) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = role === 'user' ? 'flex justify-end' : 'flex justify-start';
+
+    const bubble = document.createElement('div');
+    bubble.className = role === 'user'
+        ? 'max-w-[80%] px-4 py-2 rounded-2xl bg-blue-500 text-white rounded-br-sm'
+        : 'max-w-[80%] px-4 py-2 rounded-2xl bg-gray-100 text-gray-800 rounded-bl-sm';
+    bubble.textContent = text;
+
+    wrapper.appendChild(bubble);
+    messagesEl.appendChild(wrapper);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function setChatTyping(isTyping) {
+    const existing = document.getElementById('chat-typing');
+    if (isTyping && !existing) {
+        const messagesEl = document.getElementById('chat-messages');
+        const wrapper = document.createElement('div');
+        wrapper.id = 'chat-typing';
+        wrapper.className = 'flex justify-start';
+        wrapper.innerHTML = '<div class="px-4 py-2 rounded-2xl bg-gray-100 text-gray-500 text-sm">Polar Wear is typing…</div>';
+        messagesEl.appendChild(wrapper);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    } else if (!isTyping && existing) {
+        existing.remove();
+    }
+}
+
+async function sendChatMessage(text) {
+    const trimmed = (text || '').trim();
+    if (!trimmed) return;
+
+    const input = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('chat-send');
+    if (input) input.value = '';
+    if (sendBtn) sendBtn.disabled = true;
+
+    const startersEl = document.getElementById('chat-starters');
+    if (startersEl && chatHistory.length === 0) startersEl.classList.add('hidden');
+
+    chatHistory.push({ role: 'user', content: trimmed });
+    renderChatMessage('user', trimmed);
+    setChatTyping(true);
+
+    try {
+        const response = await fetch(chatApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messages: chatHistory,
+                weather: currentWeatherData ? currentWeatherData[0] : null,
+                suggestions: currentSuggestions,
+                zipcode: currentZipcode,
+            }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Chat failed');
+        }
+
+        const reply = result.reply || '';
+        chatHistory.push({ role: 'assistant', content: reply });
+        renderChatMessage('assistant', reply);
+    } catch (error) {
+        console.error('Chat error:', error);
+        renderChatMessage('assistant', `Sorry — ${error.message}`);
+    } finally {
+        setChatTyping(false);
+        if (sendBtn) sendBtn.disabled = false;
+        if (input) input.focus();
+    }
 }
 
 // Format structured suggestions into cards
@@ -329,5 +468,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitBtn = document.getElementById('get-suggestions-btn');
     if (submitBtn) {
         submitBtn.disabled = true;
+    }
+
+    // Chat form submit
+    const chatForm = document.getElementById('chat-form');
+    if (chatForm) {
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            sendChatMessage(input ? input.value : '');
+        });
+    }
+
+    // Chat widget toggle / close
+    const chatToggle = document.getElementById('chat-toggle');
+    if (chatToggle) {
+        chatToggle.addEventListener('click', () => setChatPanelOpen(true));
+    }
+    const chatClose = document.getElementById('chat-close');
+    if (chatClose) {
+        chatClose.addEventListener('click', () => setChatPanelOpen(false));
     }
 });
