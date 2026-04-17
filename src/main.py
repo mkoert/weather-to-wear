@@ -561,5 +561,159 @@ Rules:
         logger.error("Claude API call failed: %s", e, exc_info=True)
         return jsonify({"error": f"Failed to get fashion suggestions: {str(e)}"}), 500
 
+
+## Polar Wear Chat Endpoint
+
+CHAT_TOOLS = [
+    {
+        "name": "get_forecast",
+        "description": (
+            "Get the weather forecast for the user's saved location at a specific hour offset. "
+            "Use this when the user asks about conditions later today, tonight, or tomorrow."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "hours_ahead": {
+                    "type": "integer",
+                    "description": "Hours from now. 0 = right now, 3 = 3 hours from now, 24 = same time tomorrow.",
+                    "minimum": 0,
+                    "maximum": 48,
+                }
+            },
+            "required": ["hours_ahead"],
+        },
+    },
+    {
+        "name": "search_clothing_knowledge",
+        "description": (
+            "Semantic search over a knowledge base of clothing, fabrics, layering, and activity-specific gear. "
+            "Use for questions where basic rules aren't enough: fabric breathability, cold-weather running gear, "
+            "wet-weather layering, sport-specific recommendations, etc."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Natural-language question about clothing, fabrics, or gear.",
+                },
+                "top_k": {"type": "integer", "default": 3, "minimum": 1, "maximum": 5},
+            },
+            "required": ["query"],
+        },
+    },
+]
+
+
+def dispatch_chat_tool(name, tool_input, zipcode):
+    if name == "get_forecast":
+        hours_ahead = int(tool_input.get("hours_ahead", 0))
+        cached = get_cached_data(zipcode) if zipcode else None
+        if not cached:
+            return {"error": "No forecast data available. The user may need to refresh the page."}
+        idx = min(hours_ahead, len(cached) - 1)
+        return cached[idx]
+
+    if name == "search_clothing_knowledge":
+        return {
+            "results": [],
+            "note": "Knowledge base not yet indexed. Answer from general knowledge for now.",
+        }
+
+    return {"error": f"Unknown tool: {name}"}
+
+
+def build_chat_system_prompt(weather, suggestions):
+    parts = [
+        "You are Polar Wear, a friendly polar bear weather-and-clothing assistant.",
+        "Keep replies short, warm, and practical. Two or three sentences is usually enough.",
+        "You can use tools to look up the forecast further ahead or search a clothing knowledge base.",
+    ]
+
+    if weather:
+        parts.append(
+            "\nCurrent conditions:\n"
+            f"- Temperature: {weather.get('temp', 'N/A')}°F (feels like {weather.get('feelslike', 'N/A')}°F)\n"
+            f"- Conditions: {weather.get('conditions', 'N/A')}\n"
+            f"- Humidity: {weather.get('humidity', 'N/A')}%, Wind: {weather.get('windspeed', 'N/A')} mph\n"
+            f"- Precipitation chance: {weather.get('precipprob', 'N/A')}%"
+        )
+
+    if suggestions:
+        summary = suggestions.get("summary", "")
+        outfit_items = [item.get("item", "") for item in suggestions.get("outfit", [])]
+        if summary or outfit_items:
+            parts.append(
+                "\nThe outfit you already suggested to the user:\n"
+                f"- Summary: {summary}\n"
+                f"- Items: {', '.join(outfit_items) if outfit_items else 'none'}"
+            )
+            parts.append(
+                "Reference this outfit when relevant — don't re-suggest a whole new one unless asked."
+            )
+
+    return "\n".join(parts)
+
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+    if not session.get('logged_in'):
+        return jsonify({"error": "Login required"}), 401
+    if not anthropic_client:
+        return jsonify({"error": "Claude API not configured."}), 500
+
+    data = request.get_json(silent=True) or {}
+    history = data.get('messages', [])
+    weather = data.get('weather') or {}
+    suggestions = data.get('suggestions') or {}
+    zipcode = data.get('zipcode') or location
+
+    if not history or history[-1].get('role') != 'user':
+        return jsonify({"error": "Last message must be from user"}), 400
+
+    system_prompt = build_chat_system_prompt(weather, suggestions)
+    messages = [{"role": m["role"], "content": m["content"]} for m in history]
+
+    try:
+        MAX_TURNS = 6
+        response = None
+        for _ in range(MAX_TURNS):
+            response = anthropic_client.messages.create(
+                model="claude-opus-4-7",
+                max_tokens=2048,
+                thinking={"type": "adaptive"},
+                system=system_prompt,
+                tools=CHAT_TOOLS,
+                messages=messages,
+            )
+            messages.append({"role": "assistant", "content": response.content})
+
+            if response.stop_reason != "tool_use":
+                break
+
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    result = dispatch_chat_tool(block.name, block.input, zipcode)
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": json.dumps(result),
+                    })
+            messages.append({"role": "user", "content": tool_results})
+
+        reply = "".join(b.text for b in response.content if b.type == "text")
+        logger.info("Polar Wear chat reply, usage=%s", response.usage)
+        return jsonify({"reply": reply})
+
+    except anthropic.APIStatusError as e:
+        logger.error("Claude chat API error status=%s: %s", e.status_code, e, exc_info=True)
+        return jsonify({"error": "Chat failed. Please try again."}), 500
+    except Exception as e:
+        logger.error("Unexpected chat error: %s", e, exc_info=True)
+        return jsonify({"error": "Chat failed."}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True)
